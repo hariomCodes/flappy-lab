@@ -10,13 +10,13 @@ Space / Arrow Up / W, click, or tap: flap. P: pause/resume. R: restart. Classic 
 
 ## Challenges, adaptation, and racing
 
-The game opens on **Harder challenges**. Choose Rising pressure, Drifting gates, or Endurance climb; select an original Classic policy, a weaker practice policy, or a challenge-trained policy. Replay the same seed to compare them. You can also choose an adaptation checkpoint from transfer start through 80,000 additional training games. The comparison summary always reports the original Classic policy against the final adapted policy; checkpoint selection changes the live replay.
+The game opens on **Harder challenges**. Choose Rising pressure, Drifting gates, or Endurance climb; select an original Classic policy, a weaker practice policy, or a challenge-trained policy. Replay the same seed to compare them. The challenge and Human vs AI defaults use the checkpoint with the best average validation survival across all three challenges: currently **50,000 extra training games**. Checkpoints through 80,000 extra games remain selectable in both modes. The summary compares the original Classic policy with this validation-selected default; manual checkpoint selection changes the live replay.
 
 - **Rising pressure:** speed = `2.7 + 0.0225 × seconds` px/frame; gap = `max(82, 157 − 0.75 × seconds)` px.
 - **Drifting gates:** speed = `2.8 + 0.022 × seconds`; gap = `max(82, 148 − 0.65 × seconds)`; openings oscillate with amplitude increasing from 8 to 24 px.
 - **Endurance climb:** speed = `2.7 + 0.03 × seconds`; gap = `max(72, 157 − 0.85 × seconds)`; moving-gap amplitude grows after 20 seconds, up to 24 px.
 
-All schedules depend on the shared elapsed time, not score or actions. Speed continues rising after the gap reaches its minimum. The course changes every physics step; pipes are regenerated from the seeded random stream. Challenges have no pipe-score cap. A 180-second safety cutoff is recorded separately from collisions; none of the 600 final evaluation runs reached it. The old Classic learning gallery retains its explicitly labeled 30-pipe evaluation cap.
+All schedules depend on the shared elapsed time, not score or actions. Speed continues rising after the gap reaches its minimum. The course changes every physics step; pipes are regenerated from the seeded random stream. Challenges have no pipe-score cap. A 180-second safety cutoff is recorded separately from collisions; none of the exported evaluation runs reached it. The old Classic learning gallery retains its explicitly labeled 30-pipe evaluation cap.
 
 **Human vs AI** puts your gold bird and the blue AI bird in the same arena. Both have separate collision states but identical physics, seeded pipes, gap motion, and time-based difficulty. The race runs at real-time 1× speed. Space / Up / click / tap controls only the human bird. The first collision ends the race; the survivor wins, simultaneous collisions draw, and a shared 180-second safety timeout is a draw. P pauses both birds and the course clock. R restarts the same seed and opponent. Human wins, AI wins, and draws are supported independently of pipe-score ties.
 
@@ -26,15 +26,15 @@ Solo play also offers all three challenge courses through the Flight Conditions 
 
 The Classic 50,000-episode Q table was copied into contextual state bins, then fine-tuned for another 80,000 episodes across all three challenge types. The adaptive table also distinguishes four speed ranges and three gap-size ranges, and uses bird velocity relative to gate motion. This comparison therefore measures the combined change in representation and additional training, not an isolated effect of training budget. Weights are frozen during evaluation and gameplay; replaying a run does not perform online learning.
 
-Training seeds are 1–1,000,000. Curriculum starts include 0–60 seconds of difficulty offset, progressively introduced during the first 40,000 episodes, so later conditions receive training exposure. Validation uses 20 disjoint seeds and no exploration. Final testing uses another 100 disjoint seeds per course, shared between the original and final adapted policies. The final episode-80,000 policy is exported without choosing a best test checkpoint. This is one seeded adaptation run, not a confidence estimate over independent training runs. Some individual courses and intermediate checkpoints regress.
+Training seeds are 1–1,000,000. Curriculum starts include 0–60 seconds of difficulty offset, progressively introduced during the first 40,000 episodes, so later conditions receive training exposure. Validation uses 20 disjoint seeds per challenge and no exploration. Checkpoint selection maximizes mean survival seconds with equal weight for Rising pressure, Drifting gates, and Endurance climb; ties keep the earlier checkpoint. Test scores and training duration do not enter selection. The selected 50k checkpoint averages **45.4472s** on validation, versus **44.5775s** for the final 80k checkpoint. The original 100 held-out test courses per challenge are re-evaluated for the selected policy to keep the displayed comparison consistent. This is one seeded adaptation run, not a confidence estimate over independent training runs. Some individual courses and intermediate checkpoints regress.
 
 | Challenge | Classic mean survival | Adapted mean survival | Classic mean pipes | Adapted mean pipes |
 | --- | ---: | ---: | ---: | ---: |
-| Rising pressure | 32.90s | 47.03s | 24.35 | 37.93 |
-| Drifting gates | 24.54s | 40.55s | 17.72 | 32.59 |
-| Endurance climb | 30.27s | 40.67s | 22.89 | 33.31 |
+| Rising pressure | 32.90s | 47.96s | 24.35 | 38.56 |
+| Drifting gates | 24.54s | 40.68s | 17.72 | 32.71 |
+| Endurance climb | 30.27s | 40.52s | 22.89 | 33.24 |
 
-Run `npm run train:challenges` to reproduce adaptation, five saved checkpoints, the unsmoothed validation curve, and all final results in `dist/models/challenges.json`. Every adaptation episode is logged in `training/adaptation-history.csv`. The artifact records training and runtime source hashes; the race first-collision rule was completed after training without changing challenge physics or inference, and all 600 paired test results are revalidated against the final source.
+Run `npm run train:challenges` to reproduce adaptation, the unsmoothed validation curve, and the report in `dist/models/challenges.json`. Future training saves every new validation-best policy in addition to scheduled checkpoints, preserving a strong policy when later updates regress. `node training/select-checkpoint.mjs` selects and evaluates the strongest existing snapshot without retraining. The current five snapshots remain intact. `selection` records the rule and winning checkpoint; `selectedResults` contains its test runs. The historical final-checkpoint results remain in `results`, identified by `resultsCheckpointId`. Every adaptation episode is logged in `training/adaptation-history.csv`. The artifact records training and runtime source hashes; the race first-collision rule was completed after training without changing challenge physics or inference. All original and selected-policy evaluation results are reproduced by the tests.
 
 ## Original Classic learning gallery
 

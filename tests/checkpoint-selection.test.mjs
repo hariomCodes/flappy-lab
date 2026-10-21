@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {selectBestCheckpoint,validationScore,selectionMetadata} from '../dist/checkpoint-selection.js';
+import {ChallengeEnv,adaptiveAction,challengeRun} from '../dist/challenge-engine.js';
+const report=JSON.parse(await readFile(new URL('../dist/models/challenges.json',import.meta.url)));
+const metrics=values=>['ramp','drift','endurance'].map((course,i)=>({course,meanSeconds:values[i]}));
+test('selection uses balanced validation performance, ignoring training length and test scores',()=>{const cps=[{id:'early',episode:10,validation:metrics([40,45,50]),testScore:-100},{id:'late',episode:80,validation:metrics([55,30,40]),testScore:1000000}];assert.equal(selectBestCheckpoint(cps).id,'early');assert.equal(validationScore(cps[0].validation),45);});
+test('ties preserve the earlier checkpoint even when input ordering changes',()=>{const early={id:'early',episode:1,validation:metrics([10,20,30])},late={id:'late',episode:2,validation:metrics([20,20,20])};assert.equal(selectBestCheckpoint([late,early]).id,'early');assert.equal(selectBestCheckpoint([early,late]).id,'early');});
+test('missing or nonfinite course validation cannot silently select a default',()=>{assert.throws(()=>selectBestCheckpoint([]));assert.throws(()=>validationScore(metrics([1,2,NaN])));assert.throws(()=>validationScore(metrics([1,2,3]).slice(1)));});
+test('published selection is the true saved validation best and retains the later checkpoint',()=>{const best=selectBestCheckpoint(report.checkpoints);assert.equal(best.id,'adapt-50000');assert.deepEqual(report.selection,selectionMetadata(report.checkpoints));assert.ok(report.checkpoints.some(c=>c.id==='adapt-80000'));assert.equal(report.resultsCheckpointId,'adapt-80000');assert.equal(report.selection.source,'validation');});
+test('all selected-policy comparison results match the policy used by default',()=>{const cp=selectBestCheckpoint(report.checkpoints);for(const r of report.selectedResults){for(const expected of r.adapted.runs){const actual=challengeRun(new ChallengeEnv({seed:expected.seed,course:r.course}),e=>adaptiveAction(e,cp.q),{maxTicks:report.maxTicks});assert.equal(actual.ticks,expected.ticks);assert.equal(actual.score,expected.score);assert.equal(actual.capped,expected.capped);}assert.ok(Math.abs(r.adapted.meanSeconds-r.adapted.runs.reduce((s,v)=>s+v.seconds,0)/report.testSeeds.length)<1e-10);}});

@@ -1,0 +1,11 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {selectBestCheckpoint,selectionMetadata} from '../dist/checkpoint-selection.js';
+import {evaluateChallengePolicies} from './challenge-evaluation.mjs';
+const report=JSON.parse(await readFile('dist/models/challenges.json','utf8'));
+const original=JSON.parse(await readFile('dist/models/training.json','utf8'));
+const selected=selectBestCheckpoint(report.checkpoints);
+report.selection=selectionMetadata(report.checkpoints);
+report.resultsCheckpointId=report.resultsCheckpointId||report.checkpoints.at(-1).id;
+report.selectedResults=selected.id===report.resultsCheckpointId?report.results:evaluateChallengePolicies(selected.q,original.checkpoints.at(-1).q,report.testSeeds,report.maxTicks);
+await writeFile('dist/models/challenges.json',JSON.stringify(report));
+console.log(JSON.stringify({selection:report.selection,results:report.selectedResults.map(r=>({course:r.course,classicSeconds:r.baseline.meanSeconds,selectedSeconds:r.adapted.meanSeconds}))}));
