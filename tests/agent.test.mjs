@@ -1,0 +1,13 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {FlappyEnv} from '../dist/engine.js';
+import {TABLE_SIZE,policyAction,runPolicy} from '../dist/agent.js';
+const report=JSON.parse(await readFile(new URL('../dist/models/training.json',import.meta.url)));
+test('policies match this game engine and have finite, correctly sized tables',async()=>{const hash=createHash('sha256').update(await readFile(new URL('../dist/engine.js',import.meta.url))).digest('hex');assert.equal(report.engineHash,hash);for(const cp of report.checkpoints){assert.equal(cp.q.length,TABLE_SIZE);assert.ok(cp.q.every(Number.isFinite));}});
+test('training, validation, and test courses are disjoint',()=>{assert.ok(report.evaluation.seeds.every(seed=>seed>1000000));assert.ok(report.test.seeds.every(seed=>seed>1000000));assert.equal(new Set([...report.evaluation.seeds,...report.test.seeds]).size,130);});
+test('all saved action traces exactly reproduce policy decisions and results',()=>{for(const cp of report.checkpoints)for(const sample of cp.samples){const env=new FlappyEnv({seed:sample.seed}),run=runPolicy(env,cp.q,{...report.evaluation,record:true});assert.deepEqual(run.actions,sample.actions);assert.equal(run.score,sample.score);assert.equal(run.ticks,sample.ticks);assert.equal(run.capped,sample.capped);}});
+test('all 100 unseen-course results reproduce for every exported checkpoint',()=>{for(const cp of report.checkpoints){const t=report.test.results.find(t=>t.episode===cp.episode);for(const expected of t.runs){const env=new FlappyEnv({seed:expected.seed}),actual=runPolicy(env,cp.q,report.test);assert.equal(actual.score,expected.score);assert.equal(actual.ticks,expected.ticks);assert.equal(actual.capped,expected.capped);}assert.equal(t.meanScore,t.runs.reduce((sum,r)=>sum+r.score,0)/100);assert.equal(t.capped,t.runs.filter(r=>r.capped).length);}});
+test('final learned policy measurably improves over its untrained baseline',()=>{const baseline=report.test.results.find(t=>t.episode===0),final=report.test.results.find(t=>t.episode===50000);assert.equal(baseline.meanScore,0);assert.ok(final.meanScore>25);assert.ok(final.capped>=85);assert.ok(report.curve.some((p,i,a)=>i>0&&p.meanScore<a[i-1].meanScore),'Preserve real regressions in the curve');});
+test('browser frame-by-frame inference matches the headless evaluator',()=>{const cp=report.checkpoints.at(-1),seed=report.test.seeds[0],env=new FlappyEnv({seed});while(!env.done&&env.score<30&&env.ticks<6000)env.step(env.ticks%3===0?policyAction(env,cp.q):0);const expected=report.test.results.at(-1).runs[0];assert.equal(env.score,expected.score);assert.equal(env.ticks,expected.ticks);});
