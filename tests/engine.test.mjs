@@ -1,0 +1,11 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {FlappyEnv} from '../dist/engine.js';
+test('same seed and actions produce identical trajectories and rewards',()=>{const a=new FlappyEnv({seed:713}),b=new FlappyEnv({seed:713});for(let i=0;i<1200;i++)assert.deepEqual(a.step(i%31===0?1:0),b.step(i%31===0?1:0));assert.deepEqual(a.pipes,b.pipes);});
+test('different seeds vary gaps; reset reproduces the original state',()=>{const e=new FlappyEnv({seed:42}),original=structuredClone(e.pipes);assert.notDeepEqual(e.pipes,new FlappyEnv({seed:43}).pipes);for(let i=0;i<12;i++)e.step(0);e.reset(42);assert.deepEqual(e.pipes,original);assert.equal(e.ticks,0);});
+test('coasting hits the ground, terminal states remain stable',()=>{const e=new FlappyEnv();let result;for(let i=0;i<120;i++){result=e.step(0);if(result.terminated)break;}assert.equal(result.terminated,true);assert.equal(result.reward,-1);const state=e.info();assert.equal(e.step(1).reward,0);assert.deepEqual(e.info(),state);});
+test('flap accelerates upward and ceiling terminates',()=>{const e=new FlappyEnv();e.step(1);assert.ok(e.velocity<0);assert.equal(e.flaps,1);for(let i=0;i<100&&!e.done;i++)e.step(1);assert.equal(e.done,true);assert.ok(e.y<=e.config.radius);});
+test('pipe collision and gap passage use the same hitbox',()=>{const e=new FlappyEnv();e.pipes[0].x=e.config.birdX;e.y=e.pipes[0].top-5;assert.equal(e.step(0).terminated,true);e.reset();e.pipes[0].x=e.config.birdX;e.y=e.pipes[0].top+e.config.gap/2;assert.equal(e.step(0).terminated,false);});
+test('a passed pipe rewards one point only',()=>{const e=new FlappyEnv();e.pipes[0].x=e.config.birdX-e.config.radius-e.config.pipeWidth+1;const r=e.step(0);assert.equal(e.score,1);assert.equal(r.reward,1.01);e.step(0);assert.equal(e.score,1);});
+test('a simple feedback pilot survives and recycled pipes keep scoring',()=>{const e=new FlappyEnv({seed:91,difficulty:'gentle'});for(let i=0;i<15000&&!e.done;i++){const p=e.nextPipe(),target=p.top+e.config.gap*.55; e.step(e.y>target&&e.velocity>=0?1:0);}assert.ok(e.score>=20,`Expected 20 pipes, got ${e.score}`);assert.ok(e.pipes.length===5);});
+test('observations stay finite and invalid actions fail explicitly',()=>{const e=new FlappyEnv();assert.ok(Object.values(e.observe()).every(Number.isFinite));assert.throws(()=>e.step(2),RangeError);});
