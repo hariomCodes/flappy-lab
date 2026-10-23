@@ -2,7 +2,18 @@
 
 A playable browser game, seeded simulation, trained Q-learning policies, progressively harder challenges, and Human vs AI races. No dependencies or build step.
 
+[Play the game](https://flappy-lab-hariom.hariom-codes.chatgpt.site) · [GitHub repository](https://github.com/hariomCodes/flappy-lab)
+
 Run `npm start` in this folder, then open http://127.0.0.1:4173. Run `npm test` to validate the simulation.
+
+## Code layout
+
+- [dist/](dist/): browser game, simulation engines, trained policies, and result data. This is the application source for this buildless project and is intentionally committed.
+- [tests/](tests/): simulation, race fairness, reproducibility, and checkpoint selection checks.
+- [training/](training/): training scripts, evaluation helpers, and original per-episode logs.
+- [serve.mjs](serve.mjs): local development server.
+
+With Node.js and npm installed, no dependency installation is needed. The saved policies are included, so you can play and run tests immediately. Line endings are fixed to LF to preserve the engine fingerprints across Windows, macOS, and Linux.
 
 ## Controls
 
